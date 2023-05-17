@@ -12,3 +12,9 @@ docs/
 
 # Dotenv file
 .env
+
+#idea
+.idea
+.idea/*
+script/send.py
+
