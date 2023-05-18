@@ -61,16 +61,16 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
     function _maxTimeOffset(uint256 sVal) private pure returns(uint256 c) {
         unchecked {
             c = _max(
-                (sVal & (((1<<18) - 1) << 19)) >> 19,
+                (sVal >> 19) & ((1<<18) - 1),
                 _max(
-                    (sVal & (((1<<18) - 1) << 56)) >> 56,
+                    (sVal >> 56) & ((1<<18) - 1),
                     _max(
-                        (sVal & (((1<<18) - 1) << 93)) >> 93,
+                        (sVal >> 93) & ((1<<18) - 1),
                         _max(
-                            (sVal & (((1<<18) - 1) << 130)) >> 130,
+                            (sVal >> 130) & ((1<<18) - 1),
                             _max(
-                                (sVal & (((1<<18) - 1) << 167)) >> 167,
-                                (sVal & (((1<<18) - 1) << 204)) >> 204
+                                (sVal >> 167) & ((1<<18) - 1),
+                                (sVal >> 204) & ((1<<18) - 1)
                             )
                         )
                     )
@@ -90,9 +90,9 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
             uint256 sVal = refs[(id - 1) / 6];
             uint256 index = (id - 1) % 6;
             uint256 shiftLen = 185 - (index * 37);
-            ticks = (sVal & ((1 << 19) - 1) << shiftLen) >> shiftLen;
+            ticks = (sVal >> shiftLen) & ((1 << 19) - 1);
             shiftLen += 19;
-            lastUpdated = ((sVal & (((1 << 31) - 1) << 225)) >> 225) + ((sVal & (((1 << 18) - 1) << shiftLen)) >> shiftLen);
+            lastUpdated = ((sVal >> 225) & ((1 << 31) - 1)) + ((sVal >> shiftLen) & ((1 << 18) - 1));
         }
     }
 
@@ -102,7 +102,7 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
 
     function _getPriceFromTick(uint256 x) private pure returns(uint256 y) {
         unchecked {
-            require(x != 0, "TICKS_0_IS_AN_EMPTY_PRICE");
+            require(x != 0, "FAIL_TICKS_0_IS_AN_EMPTY_PRICE");
             y = 649037107316853453566312041152512;
             if (x < 262144) {
                 x = 262144 - x;
@@ -246,7 +246,7 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
             uint256 sVal = refs[slotID];
             uint256 sSize = (sVal >> 222) & ((1<<3) - 1);
             uint256 shiftLen = 37*(5-indexInSlot);
-            uint256 lastTAP = (sVal & (((1 << 37) - 1) << shiftLen)) >> shiftLen;
+            uint256 lastTAP = (sVal >> shiftLen) & ((1 << 37) - 1);
             sSize--;
             sVal &= type(uint256).max - (((((1<<3) - 1)) << 222) | ((1 << (37*(6 - sSize))) - 1));
             refs[slotID] = (sVal & (type(uint256).max - ((((1<<3) - 1)) << 222))) | (sSize << 222);

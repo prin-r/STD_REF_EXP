@@ -90,6 +90,22 @@ contract STD_E_2_Test is Test {
         console.log("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
     }
 
+    function testGetPriceFromTick() public {
+        vm.expectRevert("FAIL_TICKS_0_IS_AN_EMPTY_PRICE");
+        std3.getPriceFromTick(0);
+
+        assertEq(std3.getPriceFromTick(1), 4128985);
+        assertEq(std3.getPriceFromTick(10), 4132703);
+        assertEq(std3.getPriceFromTick(100), 4170063);
+        assertEq(std3.getPriceFromTick(1000), 4562755);
+        assertEq(std3.getPriceFromTick(10000), 11222063);
+        assertEq(std3.getPriceFromTick(100000), 90892410323);
+        assertEq(std3.getPriceFromTick(262144), 1000000000000000000);
+        assertEq(std3.getPriceFromTick(300000), 44053761159937252819);
+        assertEq(std3.getPriceFromTick(400000), 969863642590014515135770);
+        assertEq(std3.getPriceFromTick(524287), 242190240580283037346837115381);
+    }
+
     function testListingAnddelisting() public {
         string[] memory symbols = new string[](1);
         symbols[0] = "BTC";
@@ -832,7 +848,7 @@ contract STD_E_2_Test is Test {
         }
     }
 
-    function testRelay_FAIL_NEW_TIME_LT_CURRENT() public {
+    function testRelay_FAIL_NEW_TIME_LT_CURRENT_OR_EXCEED_3_DAYS() public {
         string[] memory symbols = new string[](9);
         symbols[0] = "AA1";
         symbols[1] = "AA2";
@@ -845,17 +861,89 @@ contract STD_E_2_Test is Test {
         symbols[8] = "AA9";
         std3.listing(symbols);
 
-        return;
+        STD_E_3.Price[] memory ps = new STD_E_3.Price[](9);
+        ps[0] = STD_E_3.Price(700, "AA7");
+        ps[1] = STD_E_3.Price(800, "AA8");
+        ps[2] = STD_E_3.Price(900, "AA9");
+        ps[3] = STD_E_3.Price(100, "AA1");
+        ps[4] = STD_E_3.Price(200, "AA2");
+        ps[5] = STD_E_3.Price(300, "AA3");
+        ps[6] = STD_E_3.Price(400, "AA4");
+        ps[7] = STD_E_3.Price(500, "AA5");
+        ps[8] = STD_E_3.Price(600, "AA6");
 
-        for (uint256 i = 0; i < 9; i++) {
-            STD_E_3.Price[] memory ps = new STD_E_3.Price[](4);
+        std3.relayRebase(1e6, MOCK_REQ_ID, ps);
+
+        ps = new STD_E_3.Price[](4);
+        ps[0] = STD_E_3.Price(110, "AA1");
+        ps[1] = STD_E_3.Price(880, "AA8");
+        ps[2] = STD_E_3.Price(990, "AA9");
+        ps[3] = STD_E_3.Price(550, "AA5");
+        std3.relay(1e6 + (1<<17), MOCK_REQ_ID, ps);
+
+        Slot memory s0 = decodeSlot(0);
+        Slot memory s1 = decodeSlot(1);
+        Slot memory s0Expected = Slot(
+            1e6,
+            6,
+            TimeOffsetAndPrice((1<<17), 110, "AA1"),
+            TimeOffsetAndPrice(0, 200, "AA2"),
+            TimeOffsetAndPrice(0, 300, "AA3"),
+            TimeOffsetAndPrice(0, 400, "AA4"),
+            TimeOffsetAndPrice((1<<17), 550, "AA5"),
+            TimeOffsetAndPrice(0, 600, "AA6")
+        );
+        Slot memory s1Expected = Slot(
+            1e6,
+            3,
+            TimeOffsetAndPrice(0, 700, "AA7"),
+            TimeOffsetAndPrice((1<<17), 880, "AA8"),
+            TimeOffsetAndPrice((1<<17), 990, "AA9"),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, "")
+        );
+
+        assertEq(keccak256(abi.encode("0.", s0, "1.", s1)), keccak256(abi.encode("0.", s0Expected, "1.", s1Expected)));
+
+        ps = new STD_E_3.Price[](4);
+        ps[0] = STD_E_3.Price(111, "AA1");
+        ps[1] = STD_E_3.Price(888, "AA8");
+        ps[2] = STD_E_3.Price(999, "AA9");
+        ps[3] = STD_E_3.Price(555, "AA5");
+        vm.expectRevert("FAIL_NEW_TIME_<=_CURRENT");
+        std3.relay(1e6 + (1<<16), MOCK_REQ_ID, ps);
+        vm.expectRevert("FAIL_NEW_TIME_<=_CURRENT");
+        std3.relay(1e6 + (1<<17), MOCK_REQ_ID, ps);
+
+        vm.expectRevert("FAIL_DELTA_TIME_EXCEED_3_DAYS");
+        std3.relay(1e6 + (1<<18) + 1, MOCK_REQ_ID, ps);
+    }
+
+    function testRelayRebase_FAIL_SYMBOL_NOT_AVAILABLE() public {
+        string[] memory symbols = new string[](9);
+        symbols[0] = "AA1";
+        symbols[1] = "AA2";
+        symbols[2] = "AA3";
+        symbols[3] = "AA4";
+        symbols[4] = "AA5";
+        symbols[5] = "AA6";
+        symbols[6] = "AA7";
+        symbols[7] = "AA8";
+        symbols[8] = "AA9";
+        std3.listing(symbols);
+
+        for (uint256 i = 0; i < 6; i++) {
+            STD_E_3.Price[] memory ps = new STD_E_3.Price[](6);
             ps[0] = STD_E_3.Price(100, "AA1");
-            ps[1] = STD_E_3.Price(200, "AA8");
-            ps[2] = STD_E_3.Price(300, "AA9");
-            ps[3] = STD_E_3.Price(400, "AA5");
-            ps[i % 4] = STD_E_3.Price(1000, "BBB");
-            vm.expectRevert("FAIL_NEW_TIME_<=_CURRENT");
-            std3.relay(5555, MOCK_REQ_ID, ps);
+            ps[1] = STD_E_3.Price(200, "AA2");
+            ps[2] = STD_E_3.Price(300, "AA3");
+            ps[3] = STD_E_3.Price(400, "AA4");
+            ps[4] = STD_E_3.Price(500, "AA5");
+            ps[5] = STD_E_3.Price(600, "AA6");
+            ps[i] = STD_E_3.Price(1000, "BBB");
+            vm.expectRevert("FAIL_SYMBOL_NOT_AVAILABLE");
+            std3.relayRebase(5555, MOCK_REQ_ID, ps);
         }
     }
 
@@ -962,4 +1050,181 @@ contract STD_E_2_Test is Test {
         std3.relayRebase(1002, MOCK_REQ_ID, ps);
     }
 
+    function testRelayRebase_FAIL_NEW_TIME_LT_CURRENT_OR_EXCEED_3_DAYS() public {
+        string[] memory symbols = new string[](9);
+        symbols[0] = "AA1";
+        symbols[1] = "AA2";
+        symbols[2] = "AA3";
+        symbols[3] = "AA4";
+        symbols[4] = "AA5";
+        symbols[5] = "AA6";
+        symbols[6] = "AA7";
+        symbols[7] = "AA8";
+        symbols[8] = "AA9";
+        std3.listing(symbols);
+
+        STD_E_3.Price[] memory ps = new STD_E_3.Price[](9);
+        ps[0] = STD_E_3.Price(700, "AA7");
+        ps[1] = STD_E_3.Price(800, "AA8");
+        ps[2] = STD_E_3.Price(900, "AA9");
+        ps[3] = STD_E_3.Price(100, "AA1");
+        ps[4] = STD_E_3.Price(200, "AA2");
+        ps[5] = STD_E_3.Price(300, "AA3");
+        ps[6] = STD_E_3.Price(400, "AA4");
+        ps[7] = STD_E_3.Price(500, "AA5");
+        ps[8] = STD_E_3.Price(600, "AA6");
+
+        std3.relayRebase(1e6, MOCK_REQ_ID, ps);
+
+        vm.expectRevert("FAIL_NEW_TIME_<=_CURRENT");
+        std3.relay(1e6 - 1, MOCK_REQ_ID, ps);
+        vm.expectRevert("FAIL_NEW_TIME_<=_CURRENT");
+        std3.relay(1e6, MOCK_REQ_ID, ps);
+
+        vm.expectRevert("FAIL_DELTA_TIME_EXCEED_3_DAYS");
+        std3.relay(1e6 + (1<<18) + 1, MOCK_REQ_ID, ps);
+
+        std3.relayRebase(1e6 + 1, MOCK_REQ_ID, ps);
+
+        Slot memory s0 = decodeSlot(0);
+        Slot memory s1 = decodeSlot(1);
+        Slot memory s0Expected = Slot(
+            1e6 + 1,
+            6,
+            TimeOffsetAndPrice(0, 100, "AA1"),
+            TimeOffsetAndPrice(0, 200, "AA2"),
+            TimeOffsetAndPrice(0, 300, "AA3"),
+            TimeOffsetAndPrice(0, 400, "AA4"),
+            TimeOffsetAndPrice(0, 500, "AA5"),
+            TimeOffsetAndPrice(0, 600, "AA6")
+        );
+        Slot memory s1Expected = Slot(
+            1e6 + 1,
+            3,
+            TimeOffsetAndPrice(0, 700, "AA7"),
+            TimeOffsetAndPrice(0, 800, "AA8"),
+            TimeOffsetAndPrice(0, 900, "AA9"),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, "")
+        );
+
+        assertEq(keccak256(abi.encode("0.", s0, "1.", s1)), keccak256(abi.encode("0.", s0Expected, "1.", s1Expected)));
+    }
+
+    function testRelayRebase_FAIL_INCONSISTENT_SIZES() public {
+        string[] memory symbols = new string[](9);
+        symbols[0] = "AA1";
+        symbols[1] = "AA2";
+        symbols[2] = "AA3";
+        symbols[3] = "AA4";
+        symbols[4] = "AA5";
+        symbols[5] = "AA6";
+        symbols[6] = "AA7";
+        symbols[7] = "AA8";
+        symbols[8] = "AA9";
+        std3.listing(symbols);
+
+        STD_E_3.Price[] memory ps = new STD_E_3.Price[](9);
+        ps[0] = STD_E_3.Price(700, "AA7");
+        ps[1] = STD_E_3.Price(800, "AA8");
+        ps[2] = STD_E_3.Price(900, "AA9");
+        ps[3] = STD_E_3.Price(100, "AA1");
+        ps[4] = STD_E_3.Price(200, "AA2");
+        ps[5] = STD_E_3.Price(300, "AA3");
+        ps[6] = STD_E_3.Price(400, "AA4");
+        ps[7] = STD_E_3.Price(500, "AA5");
+        ps[8] = STD_E_3.Price(600, "AA6");
+        std3.relayRebase(1e6, MOCK_REQ_ID, ps);
+
+        ps = new STD_E_3.Price[](8);
+        ps[0] = STD_E_3.Price(700, "AA7");
+        ps[1] = STD_E_3.Price(800, "AA8");
+        ps[2] = STD_E_3.Price(900, "AA9");
+        ps[3] = STD_E_3.Price(100, "AA1");
+        ps[4] = STD_E_3.Price(200, "AA2");
+        ps[5] = STD_E_3.Price(300, "AA3");
+        ps[6] = STD_E_3.Price(400, "AA4");
+        ps[7] = STD_E_3.Price(500, "AA5");
+        vm.expectRevert("FAIL_INCONSISTENT_SIZES");
+        std3.relayRebase(1e6 + 1, MOCK_REQ_ID, ps);
+
+        ps = new STD_E_3.Price[](8);
+        ps[0] = STD_E_3.Price(100, "AA1");
+        ps[1] = STD_E_3.Price(200, "AA2");
+        ps[2] = STD_E_3.Price(300, "AA3");
+        ps[3] = STD_E_3.Price(400, "AA4");
+        ps[4] = STD_E_3.Price(500, "AA5");
+        ps[5] = STD_E_3.Price(600, "AA6");
+        ps[6] = STD_E_3.Price(700, "AA7");
+        ps[7] = STD_E_3.Price(800, "AA8");
+        vm.expectRevert("FAIL_INCONSISTENT_SIZES");
+        std3.relayRebase(1e6 + 1, MOCK_REQ_ID, ps);
+    }
+
+    function testGetReferenceData() public {
+        string[] memory symbols = new string[](4);
+        symbols[0] = "BTC";
+        symbols[1] = "ETH";
+        symbols[2] = "DAI";
+        symbols[3] = "USDC";
+        std3.listing(symbols);
+
+        STD_E_3.Price[] memory ps = new STD_E_3.Price[](4);
+        ps[0] = STD_E_3.Price(1111, "BTC");
+        ps[1] = STD_E_3.Price(2222, "ETH");
+        ps[2] = STD_E_3.Price(3333, "DAI");
+        ps[3] = STD_E_3.Price(4444, "USDC");
+        std3.relayRebase(1e6, MOCK_REQ_ID, ps);
+
+        ps = new STD_E_3.Price[](1);
+        ps[0] = STD_E_3.Price(364087, "BTC");
+        std3.relay(1e6 + 1, MOCK_REQ_ID, ps);
+
+        ps[0] = STD_E_3.Price(337088, "ETH");
+        std3.relay(1e6 + 2, MOCK_REQ_ID, ps);
+
+        ps[0] = STD_E_3.Price(262138, "DAI");
+        std3.relay(1e6 + 3, MOCK_REQ_ID, ps);
+
+        ps[0] = STD_E_3.Price(262140, "USDC");
+        std3.relay(1e6 + 4, MOCK_REQ_ID, ps);
+
+        assertEq(
+            abi.encode(std3.getReferenceData("USD", "USD")),
+            abi.encode(IStdReference.ReferenceData(1e18, block.timestamp, block.timestamp)
+        ));
+        assertEq(
+            abi.encode(std3.getReferenceData("BTC", "USD")),
+            abi.encode(IStdReference.ReferenceData(26736643493622462548344, 1e6 + 1, block.timestamp)
+        ));
+        assertEq(
+            abi.encode(std3.getReferenceData("ETH", "USD")),
+            abi.encode(IStdReference.ReferenceData(1797272119099405449069, 1e6 + 2, block.timestamp)
+        ));
+        assertEq(
+            abi.encode(std3.getReferenceData("DAI", "USD")),
+            abi.encode(IStdReference.ReferenceData(999400209944012597, 1e6 + 3, block.timestamp)
+        ));
+        assertEq(
+            abi.encode(std3.getReferenceData("USDC", "USD")),
+            abi.encode(IStdReference.ReferenceData(999600099980003499, 1e6 + 4, block.timestamp)
+        ));
+        assertEq(
+            abi.encode(std3.getReferenceData("BTC", "ETH")),
+            abi.encode(IStdReference.ReferenceData(14876235607004196601, 1e6 + 1, 1e6 + 2)
+        ));
+        assertEq(
+            abi.encode(std3.getReferenceData("ETH", "BTC")),
+            abi.encode(IStdReference.ReferenceData(67221306950070671, 1e6 + 2, 1e6 + 1)
+        ));
+        assertEq(
+            abi.encode(std3.getReferenceData("DAI", "USDC")),
+            abi.encode(IStdReference.ReferenceData(999800029996000499, 1e6 + 3, 1e6 + 4)
+        ));
+        assertEq(
+            abi.encode(std3.getReferenceData("USDC", "DAI")),
+            abi.encode(IStdReference.ReferenceData(1000200009999999999, 1e6 + 4, 1e6 + 3)
+        ));
+    }
 }
