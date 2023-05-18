@@ -271,7 +271,6 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
             uint256 sid = type(uint256).max;
             uint256 sTime;
             uint256 sVal;
-            uint256 sSize;
             for (uint256 i = 0; i < ps.length; i++) {
                 id = symbolsToIDs[ps[i].symbol];
                 require(id != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
@@ -285,13 +284,10 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
                     sVal = refs[slotID];
                     sid = slotID;
                     sTime = (sVal >> 225) & ((1 << 31) - 1);
-                    sSize = (sVal >> 222) & ((1 << 3) - 1);
                 }
 
                 uint256 indexInSlot = (id - 1) % 6;
                 uint256 shiftLen = 204 - (37*indexInSlot);
-                require(indexInSlot < sSize, "FAIL_INDEX_EXCEED_SLOT_SIZE");
-
                 require(sTime + ((sVal >> shiftLen) & ((1 << 18) - 1)) < time, "FAIL_NEW_TIME_<=_CURRENT");
                 require(time < sTime + (1<<18), "FAIL_DELTA_TIME_EXCEED_3_DAYS");
                 uint256 delta = time - sTime;

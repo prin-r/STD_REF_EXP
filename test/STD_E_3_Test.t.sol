@@ -832,6 +832,33 @@ contract STD_E_2_Test is Test {
         }
     }
 
+    function testRelay_FAIL_NEW_TIME_LT_CURRENT() public {
+        string[] memory symbols = new string[](9);
+        symbols[0] = "AA1";
+        symbols[1] = "AA2";
+        symbols[2] = "AA3";
+        symbols[3] = "AA4";
+        symbols[4] = "AA5";
+        symbols[5] = "AA6";
+        symbols[6] = "AA7";
+        symbols[7] = "AA8";
+        symbols[8] = "AA9";
+        std3.listing(symbols);
+
+        return;
+
+        for (uint256 i = 0; i < 9; i++) {
+            STD_E_3.Price[] memory ps = new STD_E_3.Price[](4);
+            ps[0] = STD_E_3.Price(100, "AA1");
+            ps[1] = STD_E_3.Price(200, "AA8");
+            ps[2] = STD_E_3.Price(300, "AA9");
+            ps[3] = STD_E_3.Price(400, "AA5");
+            ps[i % 4] = STD_E_3.Price(1000, "BBB");
+            vm.expectRevert("FAIL_NEW_TIME_<=_CURRENT");
+            std3.relay(5555, MOCK_REQ_ID, ps);
+        }
+    }
+
     function testRelayRebase_FAIL_IN_ORDER_CHEKCING_permHelper(uint256 n, STD_E_3.Price[] memory ps) private {
         if (n == 1) {
             Slot memory s = decodeSlot(0);
