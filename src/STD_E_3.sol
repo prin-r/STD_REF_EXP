@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 
 interface IStdReference {
@@ -57,18 +58,17 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
         _grantRole(RELAYER_ROLE, msg.sender);
     }
 
-    function _max(uint256 a, uint256 b) private pure returns(uint256 c) { c = a > b ? a: b; }
     function _maxTimeOffset(uint256 sVal) private pure returns(uint256 c) {
         unchecked {
-            c = _max(
+            c = Math.max(
                 (sVal >> 19) & ((1<<18) - 1),
-                _max(
+                Math.max(
                     (sVal >> 56) & ((1<<18) - 1),
-                    _max(
+                    Math.max(
                         (sVal >> 93) & ((1<<18) - 1),
-                        _max(
+                        Math.max(
                             (sVal >> 130) & ((1<<18) - 1),
-                            _max(
+                            Math.max(
                                 (sVal >> 167) & ((1<<18) - 1),
                                 (sVal >> 204) & ((1<<18) - 1)
                             )
