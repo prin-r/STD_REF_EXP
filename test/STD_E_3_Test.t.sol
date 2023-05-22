@@ -81,12 +81,12 @@ contract STD_E_2_Test is Test {
         Slot memory s = decodeSlot(x);
         console.log("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
         console.log("(time, count):  ", s.time, s.symbolsCount);
-        console.log("(ticks1, time1, symbol1): ", s.tp1.ticks, s.tp1.timeOffset, s.tp1.symbol);
-        console.log("(ticks2, time2, symbol2): ", s.tp2.ticks, s.tp2.timeOffset, s.tp2.symbol);
-        console.log("(ticks3, time3, symbol3): ", s.tp3.ticks, s.tp3.timeOffset, s.tp3.symbol);
-        console.log("(ticks4, time4, symbol4): ", s.tp4.ticks, s.tp4.timeOffset, s.tp4.symbol);
-        console.log("(ticks5, time5, symbol5): ", s.tp5.ticks, s.tp5.timeOffset, s.tp5.symbol);
-        console.log("(ticks6, time6, symbol6): ", s.tp6.ticks, s.tp6.timeOffset, s.tp6.symbol);
+        console.log("(time1, ticks1, symbol1): ", s.tp1.timeOffset, s.tp1.ticks, s.tp1.symbol);
+        console.log("(time2, ticks2, symbol2): ", s.tp2.timeOffset, s.tp2.ticks, s.tp2.symbol);
+        console.log("(time3, ticks3, symbol3): ", s.tp3.timeOffset, s.tp3.ticks, s.tp3.symbol);
+        console.log("(time4, ticks4, symbol4): ", s.tp4.timeOffset, s.tp4.ticks, s.tp4.symbol);
+        console.log("(time5, ticks5, symbol5): ", s.tp5.timeOffset, s.tp5.ticks, s.tp5.symbol);
+        console.log("(time6, ticks6, symbol6): ", s.tp6.timeOffset, s.tp6.ticks, s.tp6.symbol);
         console.log("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
     }
 
@@ -408,13 +408,186 @@ contract STD_E_2_Test is Test {
         ps[10] = STD_E_3.Price(510, "DAI");
         ps[11] = STD_E_3.Price(610, "DOGE");
         ps[12] = STD_E_3.Price(710, "BAND");
-        std3.relayRebase(3333, MOCK_REQ_ID, ps);
+        std3.relayRebase(3500, MOCK_REQ_ID, ps);
 
         for (uint256 i = 0; i < 13; i++) {
             (uint256 ticks, uint256 lastUpdated) = std3.getTicksAndTime(ps[i].symbol);
             assertEq(ticks, ps[i].ticks);
-            assertEq(lastUpdated, 3333);
+            assertEq(lastUpdated, 3500);
         }
+
+        ps = new STD_E_3.Price[](9);
+        ps[0] = STD_E_3.Price(1100, "SNX");
+        ps[1] = STD_E_3.Price(1100, "ADA");
+        ps[2] = STD_E_3.Price(1100, "XRP");
+        ps[3] = STD_E_3.Price(1100, "DOT");
+        ps[4] = STD_E_3.Price(1100, "SOL");
+        ps[5] = STD_E_3.Price(1100, "LINK");
+        ps[6] = STD_E_3.Price(1100, "UNI");
+        ps[7] = STD_E_3.Price(1100, "BAND");
+        ps[8] = STD_E_3.Price(1100, "BNB");
+        std3.relay(4000, MOCK_REQ_ID, ps);
+
+        Slot memory s0 = decodeSlot(0);
+        Slot memory s1 = decodeSlot(1);
+        Slot memory s2 = decodeSlot(2);
+        Slot memory s0Expected = Slot(
+            3500,
+            6,
+            TimeOffsetAndPrice(0, 100, "ETH"),
+            TimeOffsetAndPrice(500, 1100, "BNB"),
+            TimeOffsetAndPrice(500, 1100, "ADA"),
+            TimeOffsetAndPrice(0, 400, "BTC"),
+            TimeOffsetAndPrice(500, 1100, "XRP"),
+            TimeOffsetAndPrice(500, 1100, "DOT")
+        );
+        Slot memory s1Expected = Slot(
+            3500,
+            6,
+            TimeOffsetAndPrice(500, 1100, "SOL"),
+            TimeOffsetAndPrice(500, 1100, "UNI"),
+            TimeOffsetAndPrice(500, 1100, "LINK"),
+            TimeOffsetAndPrice(500, 1100, "SNX"),
+            TimeOffsetAndPrice(0, 510, "DAI"),
+            TimeOffsetAndPrice(0, 610, "DOGE")
+        );
+        Slot memory s2Expected = Slot(
+            3500,
+            1,
+            TimeOffsetAndPrice(500, 1100, "BAND"),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, "")
+        );
+
+        assertEq(
+            keccak256(abi.encode("0.", s0, "1.", s1, "2.", s2)),
+            keccak256(abi.encode("0.", s0Expected, "1.", s1Expected, "2.", s2Expected))
+        );
+
+        ps = new STD_E_3.Price[](6);
+        ps[0] = STD_E_3.Price(1200, "ETH");
+        ps[1] = STD_E_3.Price(1200, "BNB");
+        ps[2] = STD_E_3.Price(1200, "ADA");
+        ps[3] = STD_E_3.Price(1200, "BTC");
+        ps[4] = STD_E_3.Price(1200, "XRP");
+        ps[5] = STD_E_3.Price(1200, "DOT");
+        std3.relayRebase(3600, MOCK_REQ_ID, ps);
+
+        s0 = decodeSlot(0);
+        s1 = decodeSlot(1);
+        s2 = decodeSlot(2);
+        s0Expected = Slot(
+            3600,
+            6,
+            TimeOffsetAndPrice(0, 1200, "ETH"),
+            TimeOffsetAndPrice(400, 1100, "BNB"),
+            TimeOffsetAndPrice(400, 1100, "ADA"),
+            TimeOffsetAndPrice(0, 1200, "BTC"),
+            TimeOffsetAndPrice(400, 1100, "XRP"),
+            TimeOffsetAndPrice(400, 1100, "DOT")
+        );
+
+        assertEq(
+            keccak256(abi.encode("0.", s0, "1.", s1, "2.", s2)),
+            keccak256(abi.encode("0.", s0Expected, "1.", s1Expected, "2.", s2Expected))
+        );
+
+        ps = new STD_E_3.Price[](7);
+        ps[0] = STD_E_3.Price(1300, "SOL");
+        ps[1] = STD_E_3.Price(1300, "UNI");
+        ps[2] = STD_E_3.Price(1300, "LINK");
+        ps[3] = STD_E_3.Price(1300, "SNX");
+        ps[4] = STD_E_3.Price(1300, "DAI");
+        ps[5] = STD_E_3.Price(1300, "DOGE");
+        ps[6] = STD_E_3.Price(1300, "BAND");
+        std3.relayRebase(3700, MOCK_REQ_ID, ps);
+
+        s0 = decodeSlot(0);
+        s1 = decodeSlot(1);
+        s2 = decodeSlot(2);
+        s1Expected = Slot(
+            3700,
+            6,
+            TimeOffsetAndPrice(300, 1100, "SOL"),
+            TimeOffsetAndPrice(300, 1100, "UNI"),
+            TimeOffsetAndPrice(300, 1100, "LINK"),
+            TimeOffsetAndPrice(300, 1100, "SNX"),
+            TimeOffsetAndPrice(0, 1300, "DAI"),
+            TimeOffsetAndPrice(0, 1300, "DOGE")
+        );
+        s2Expected = Slot(
+            3700,
+            1,
+            TimeOffsetAndPrice(300, 1100, "BAND"),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, "")
+        );
+
+        assertEq(
+            keccak256(abi.encode("0.", s0, "1.", s1, "2.", s2)),
+            keccak256(abi.encode("0.", s0Expected, "1.", s1Expected, "2.", s2Expected))
+        );
+
+        ps = new STD_E_3.Price[](13);
+        ps[0] = STD_E_3.Price(100, "ETH");
+        ps[1] = STD_E_3.Price(200, "BNB");
+        ps[2] = STD_E_3.Price(300, "ADA");
+        ps[3] = STD_E_3.Price(400, "BTC");
+        ps[4] = STD_E_3.Price(500, "XRP");
+        ps[5] = STD_E_3.Price(600, "DOT");
+        ps[6] = STD_E_3.Price(700, "SOL");
+        ps[7] = STD_E_3.Price(800, "UNI");
+        ps[8] = STD_E_3.Price(900, "LINK");
+        ps[9] = STD_E_3.Price(1000, "SNX");
+        ps[10] = STD_E_3.Price(1100, "DAI");
+        ps[11] = STD_E_3.Price(1200, "DOGE");
+        ps[12] = STD_E_3.Price(1300, "BAND");
+        std3.relayRebase(4000, MOCK_REQ_ID, ps);
+
+        s0 = decodeSlot(0);
+        s1 = decodeSlot(1);
+        s2 = decodeSlot(2);
+        s0Expected = Slot(
+            4000,
+            6,
+            TimeOffsetAndPrice(0, 100, "ETH"),
+            TimeOffsetAndPrice(0, 200, "BNB"),
+            TimeOffsetAndPrice(0, 300, "ADA"),
+            TimeOffsetAndPrice(0, 400, "BTC"),
+            TimeOffsetAndPrice(0, 500, "XRP"),
+            TimeOffsetAndPrice(0, 600, "DOT")
+        );
+        s1Expected = Slot(
+            4000,
+            6,
+            TimeOffsetAndPrice(0, 700, "SOL"),
+            TimeOffsetAndPrice(0, 800, "UNI"),
+            TimeOffsetAndPrice(0, 900, "LINK"),
+            TimeOffsetAndPrice(0, 1000, "SNX"),
+            TimeOffsetAndPrice(0, 1100, "DAI"),
+            TimeOffsetAndPrice(0, 1200, "DOGE")
+        );
+        s2Expected = Slot(
+            4000,
+            1,
+            TimeOffsetAndPrice(0, 1300, "BAND"),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, ""),
+            TimeOffsetAndPrice(0, 0, "")
+        );
+
+        assertEq(
+            keccak256(abi.encode("0.", s0, "1.", s1, "2.", s2)),
+            keccak256(abi.encode("0.", s0Expected, "1.", s1Expected, "2.", s2Expected))
+        );
     }
 
     function testRelayAndRelayRebase() public {
@@ -548,10 +721,6 @@ contract STD_E_2_Test is Test {
             assertEq(ticks, taps[i].ticks);
             assertEq(lastUpdated, taps[i].timeOffset);
         }
-
-        assertEq(std3.maxTimeOffset(0), 222);
-        assertEq(std3.maxTimeOffset(1), 222);
-        assertEq(std3.maxTimeOffset(2), 222);
 
         symbols = new string[](2);
         symbols[0] = "DOT";
@@ -1050,7 +1219,7 @@ contract STD_E_2_Test is Test {
         std3.relayRebase(1002, MOCK_REQ_ID, ps);
     }
 
-    function testRelayRebase_FAIL_NEW_TIME_LT_CURRENT_OR_EXCEED_3_DAYS() public {
+    function testRelayRebase_FAIL_NEW_TIME_LT_CURRENT() public {
         string[] memory symbols = new string[](9);
         symbols[0] = "AA1";
         symbols[1] = "AA2";
@@ -1080,9 +1249,6 @@ contract STD_E_2_Test is Test {
         std3.relay(1e6 - 1, MOCK_REQ_ID, ps);
         vm.expectRevert("FAIL_NEW_TIME_<=_CURRENT");
         std3.relay(1e6, MOCK_REQ_ID, ps);
-
-        vm.expectRevert("FAIL_DELTA_TIME_EXCEED_3_DAYS");
-        std3.relay(1e6 + (1<<18) + 1, MOCK_REQ_ID, ps);
 
         std3.relayRebase(1e6 + 1, MOCK_REQ_ID, ps);
 

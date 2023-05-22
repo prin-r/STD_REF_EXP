@@ -3,8 +3,6 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
 
 interface IStdReference {
     /// A structure returned whenever someone requests for standard reference data.
@@ -58,29 +56,37 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
         _grantRole(RELAYER_ROLE, msg.sender);
     }
 
-    function _maxTimeOffset(uint256 sVal) private pure returns(uint256 c) {
-        unchecked {
-            c = Math.max(
-                (sVal >> 19) & ((1<<18) - 1),
-                Math.max(
-                    (sVal >> 56) & ((1<<18) - 1),
-                    Math.max(
-                        (sVal >> 93) & ((1<<18) - 1),
-                        Math.max(
-                            (sVal >> 130) & ((1<<18) - 1),
-                            Math.max(
-                                (sVal >> 167) & ((1<<18) - 1),
-                                (sVal >> 204) & ((1<<18) - 1)
-                            )
-                        )
-                    )
-                )
-            );
-        }
+    function _extractSlotTime(uint256 val) private pure returns (uint256 t) {
+        t = (val >> 225) & ((1 << 31) - 1);
     }
 
-    function maxTimeOffset(uint256 slotID) public view returns(uint256 v) {
-        v = _maxTimeOffset(refs[slotID]);
+    function _extractSize(uint256 val) private pure returns (uint256 s) {
+        s = (val >> 222) & ((1<<3) - 1);
+    }
+
+    function _extractTicks(uint256 val, uint256 shiftLen) private pure returns (uint256 ticks) {
+        ticks = (val >> shiftLen) & ((1 << 19) - 1);
+    }
+
+    function _extractTimeOffset(uint256 val, uint256 shiftLen) private pure returns (uint256 offset) {
+        offset = (val >> shiftLen) & ((1 << 18) - 1);
+    }
+
+    function _setTime(uint256 val, uint256 time) private pure returns (uint256 newVal) {
+        newVal = (val & (type(uint256).max >> 31)) | (time << 225);
+    }
+
+    function _setSize(uint256 val, uint256 size) private pure returns (uint256 newVal) {
+        newVal = (val & (type(uint256).max - ((((1<<3) - 1)) << 222))) | (size << 222);
+    }
+
+    function _setTimeOffset(uint256 val, uint256 timeOffset, uint256 shiftLen) private pure returns (uint256 newVal) {
+        newVal = (val & ~(uint256((1 << 18) - 1) << (shiftLen + 19))) | (timeOffset << (shiftLen + 19));
+    }
+
+    function _setTicksAndTimeOffset(uint256 val, uint256 offset, uint256 ticks, uint256 shiftLen) private pure returns(uint256 newVal) {
+        newVal = val & (~(uint256((1 << 37) - 1) << shiftLen));
+        newVal |= ((offset << 19) | ticks & ((1<<19) - 1)) << shiftLen;
     }
     
     function _getTicksAndTime(string memory symbol) private view returns (uint256 ticks, uint256 lastUpdated) {
@@ -90,9 +96,8 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
             uint256 sVal = refs[(id - 1) / 6];
             uint256 index = (id - 1) % 6;
             uint256 shiftLen = 185 - (index * 37);
-            ticks = (sVal >> shiftLen) & ((1 << 19) - 1);
-            shiftLen += 19;
-            lastUpdated = ((sVal >> 225) & ((1 << 31) - 1)) + ((sVal >> shiftLen) & ((1 << 18) - 1));
+            (ticks, lastUpdated) = (_extractTicks(sVal, shiftLen), _extractTimeOffset(sVal, shiftLen + 19));
+            lastUpdated += _extractSlotTime(sVal);
         }
     }
 
@@ -195,14 +200,14 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
         uint256 _totalSymbolsCount = totalSymbolsCount;
         uint256 sid = _totalSymbolsCount / 6;
         uint256 sVal = refs[sid];
-        uint256 sSize = (sVal >> 222) & ((1<<3) - 1);
+        uint256 sSize = _extractSize(sVal);
 
         _totalSymbolsCount++;
         symbolsToIDs[symbols[0]] = _totalSymbolsCount;
         idsToSymbols[_totalSymbolsCount] = symbols[0];
 
         sSize++;
-        sVal = (sVal & (type(uint256).max - ((((1<<3) - 1)) << 222))) | (sSize << 222);
+        sVal = _setSize(sVal, sSize);
 
         for (uint256 i = 1; i < symbols.length; i++) {
             require(keccak256(bytes(symbols[i])) != USD, "FAIL_USD_CANT_BE_SET");
@@ -219,11 +224,11 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
 
                 sid = slotID;
                 sVal = refs[sid];
-                sSize = (sVal >> 222) & ((1<<3) - 1);
+                sSize = _extractSize(sVal);
             }
 
             sSize++;
-            sVal = (sVal & (type(uint256).max - ((((1<<3) - 1)) << 222))) | (sSize << 222);
+            sVal = _setSize(sVal, sSize);
         }
 
         refs[sid] = sVal;
@@ -244,17 +249,17 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
             uint256 slotID = (_totalSymbolsCount - 1) / 6;
             uint256 indexInSlot = (_totalSymbolsCount - 1) % 6;
             uint256 sVal = refs[slotID];
-            uint256 sSize = (sVal >> 222) & ((1<<3) - 1);
+            uint256 sSize = _extractSize(sVal);
             uint256 shiftLen = 37*(5-indexInSlot);
-            uint256 lastTAP = (sVal >> shiftLen) & ((1 << 37) - 1);
+            uint256 lastSegment = (sVal >> shiftLen) & ((1 << 37) - 1);
             sSize--;
-            sVal &= type(uint256).max - (((((1<<3) - 1)) << 222) | ((1 << (37*(6 - sSize))) - 1));
-            refs[slotID] = (sVal & (type(uint256).max - ((((1<<3) - 1)) << 222))) | (sSize << 222);
+            sVal &= type(uint256).max << (37*(6 - sSize));
+            refs[slotID] = _setSize(sVal, sSize);
 
             slotID = (id - 1) / 6;
             indexInSlot = (id - 1) % 6;
             shiftLen = 37*(5-indexInSlot);
-            refs[slotID] = (refs[slotID] & (type(uint256).max - (((1<<37) - 1) << shiftLen))) | (lastTAP << shiftLen);
+            refs[slotID] = (refs[slotID] & (type(uint256).max - (((1<<37) - 1) << shiftLen))) | (lastSegment << shiftLen);
 
             delete symbolsToIDs[symbols[i]];
             delete idsToSymbols[_totalSymbolsCount];
@@ -269,78 +274,71 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
         unchecked {
             uint256 id;
             uint256 sid = type(uint256).max;
+            uint256 nextSID;
             uint256 sTime;
             uint256 sVal;
+            uint256 shiftLen;
             for (uint256 i = 0; i < ps.length; i++) {
                 id = symbolsToIDs[ps[i].symbol];
                 require(id != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
 
-                uint256 slotID = (id - 1) / 6;
-                if (sid != slotID) {
-                    if (sVal != 0) {
-                        refs[sid] = sVal;
-                    }
+                nextSID = (id - 1) / 6;
+                if (sid != nextSID) {
+                    if (sVal != 0) refs[sid] = sVal;
 
-                    sVal = refs[slotID];
-                    sid = slotID;
-                    sTime = (sVal >> 225) & ((1 << 31) - 1);
+                    sVal = refs[nextSID];
+                    sid = nextSID;
+                    sTime = _extractSlotTime(sVal);
                 }
 
-                uint256 indexInSlot = (id - 1) % 6;
-                uint256 shiftLen = 204 - (37*indexInSlot);
-                require(sTime + ((sVal >> shiftLen) & ((1 << 18) - 1)) < time, "FAIL_NEW_TIME_<=_CURRENT");
+                shiftLen = 204 - (37*((id - 1) % 6));
+                require(sTime + _extractTimeOffset(sVal, shiftLen) < time, "FAIL_NEW_TIME_<=_CURRENT");
                 require(time < sTime + (1<<18), "FAIL_DELTA_TIME_EXCEED_3_DAYS");
-                uint256 delta = time - sTime;
-
-                shiftLen = shiftLen - 19;
-                sVal &= ~(uint256((1 << 37) - 1) << shiftLen);
-                sVal |= ((delta << 19) | ps[i].ticks & ((1<<19) - 1)) << shiftLen;
+                sVal = _setTicksAndTimeOffset(sVal, time - sTime, ps[i].ticks, shiftLen - 19);
             }
 
-            if (sVal != 0) {
-                refs[sid] = sVal;
-            }
+            if (sVal != 0) refs[sid] = sVal;
         }
     }
 
     function relayRebase(uint256 time, uint256 requestID, Price[] calldata ps) external onlyRole(RELAYER_ROLE) {
         unchecked {
             uint256 id;
-            uint256 sid;
+            uint256 nextID;
             uint256 sVal;
             uint256 sTime;
             uint256 sSize;
-            uint256 expectedSumOfSizes;
-            for (uint i = 0; i < ps.length; i++) {
-                uint256 nextID = symbolsToIDs[ps[i].symbol];
-                require(nextID != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
-
-                if (sSize != 0) {
-                    require((id - 1) / 6 == sid && id + 1 == nextID, "FAIL_INVALID_ID_SEQUENCE");
-
-                    id = nextID;
-                    uint256 shiftLen = 185 - 37 * ((id - 1) % 6);
-                    sVal |= (ps[i].ticks & ((1<<19) - 1)) << shiftLen;
-                } else {
-                    require((nextID - 1) % 6 == 0, "FAIL_INVALID_FIRST_ID");
-                    if (sVal != 0) refs[sid] = sVal;
-
-                    id = nextID;
-                    sid = (id - 1) / 6;
-                    sVal = refs[sid];
-                    sTime = (sVal >> 225) & ((1<<31) - 1);
-                    require(_maxTimeOffset(sVal) + sTime < time, "FAIL_NEW_TIME_<=_MAX_CURRENT");
-                    sSize = (sVal >> 222) & ((1<<3) - 1);
-                    sVal = (sVal & (((1<<3) - 1) << 222)) | ((time & ((1<<31) - 1)) << 225) | (ps[i].ticks << 185);
-
-                    expectedSumOfSizes += sSize;
+            uint256 shiftLen;
+            uint256 timeOffset;
+            uint256 i;
+            while (i < ps.length) {
+                id = symbolsToIDs[ps[i].symbol];
+                require(id != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
+                require((id - 1) % 6 == 0, "FAIL_INVALID_FIRST_ID");
+                sVal = refs[(id - 1) / 6];
+                (sTime, sSize) = (_extractSlotTime(sVal), _extractSize(sVal));
+                require(sTime < time, "FAIL_NEW_TIME_<=_CURRENT");
+                shiftLen = 204;
+                timeOffset = _extractTimeOffset(sVal, shiftLen);
+                shiftLen = shiftLen - 19;
+                sVal = sTime + timeOffset <= time ?
+                    _setTicksAndTimeOffset(sVal, 0, ps[i].ticks, shiftLen) :
+                    _setTimeOffset(sVal, (sTime + timeOffset) - time, shiftLen);
+                for (uint256 j = i + 1; j < i + sSize; j++) {
+                    require(j < ps.length, "FAIL_INCONSISTENT_SIZES");
+                    nextID = symbolsToIDs[ps[j].symbol];
+                    require(nextID != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
+                    require(nextID + i == id + j, "FAIL_INVALID_ID_SEQUENCE");
+                    shiftLen -= 18;
+                    timeOffset = _extractTimeOffset(sVal, shiftLen);
+                    shiftLen -= 19;
+                    sVal = sTime + timeOffset <= time ?
+                        _setTicksAndTimeOffset(sVal, 0, ps[j].ticks, shiftLen) :
+                        _setTimeOffset(sVal, (sTime + timeOffset) - time, shiftLen);
                 }
-
-                sSize--;
+                refs[(id - 1) / 6] = _setTime(sVal, time);
+                i += sSize;
             }
-
-            require(expectedSumOfSizes == ps.length, "FAIL_INCONSISTENT_SIZES");
-            if (sVal != 0) refs[sid] = sVal;
         }
     }
 
