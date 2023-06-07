@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.18;
 
 import "forge-std/Test.sol";
 import "../src/STD_E_3.sol";
@@ -667,7 +667,9 @@ contract STD_E_2_Test is Test {
         ps[14] = STD_E_3.Price(275710, "AA1");
         ps[15] = STD_E_3.Price(276710, "AA3");
         ps[16] = STD_E_3.Price(277710, "AA7");
+        uint256 gl = gasleft();
         std3.relayRebase(1684100000, MOCK_REQ_ID, ps);
+        console.log("relay rebase gasUsed", gl - gasleft());
         for (uint256 i = 0; i < 17; i++) {
             (uint256 ticks, uint256 lastUpdated) = std3.getTicksAndTime(ps[i].symbol);
             assertEq(ticks, ps[i].ticks);
@@ -684,7 +686,9 @@ contract STD_E_2_Test is Test {
         ps[6] = STD_E_3.Price(320030, "DAI");
         ps[7] = STD_E_3.Price(330030, "SNX");
         ps[8] = STD_E_3.Price(355550, "ETH");
+        gl = gasleft();
         std3.relay(1684100112, MOCK_REQ_ID, ps);
+        console.log("relay 1. gasUsed", gl - gasleft());
 
         ps = new STD_E_3.Price[](9);
         ps[0] = STD_E_3.Price(283030, "AA6");
@@ -696,7 +700,9 @@ contract STD_E_2_Test is Test {
         ps[6] = STD_E_3.Price(290040, "AA9");
         ps[7] = STD_E_3.Price(290050, "SNX2");
         ps[8] = STD_E_3.Price(295550, "ETH");
+        gl = gasleft();
         std3.relay(1684100222, MOCK_REQ_ID, ps);
+        console.log("relay 2. gasUsed", gl - gasleft());
 
         TimeOffsetAndPrice[] memory taps = new TimeOffsetAndPrice[](17);
         taps[0] = TimeOffsetAndPrice(1684100222, 283030, "AA6");
