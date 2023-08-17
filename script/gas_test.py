@@ -21,14 +21,16 @@ my_address = mappping[network]['addr']
 print(w3.eth.getTransactionCount(my_address))
 print(w3.eth.get_balance(my_address))
 
+
 def generate_data(prefix, size):
     tmp = []
     for i in range(size):
-        s = "A" + str(i+1)
+        s = "A" + str(i + 1)
         if i < 9:
             s = "A" + s
-        tmp += [[10000 + (prefix * 100) + i+1, s]]
+        tmp += [[10000 + (prefix * 100) + i + 1, s]]
     return tmp
+
 
 def gen_com(n, k, current_sum=0, start=0, current_combination=[]):
     if k == 0 and current_sum == n:
@@ -36,9 +38,10 @@ def gen_com(n, k, current_sum=0, start=0, current_combination=[]):
         return
     if k == 0 or current_sum > n:
         return
-    for i in range(start, n+1):
-        yield from gen_com(n, k-1, current_sum+i, i, current_combination + [i])
-        
+    for i in range(start, n + 1):
+        yield from gen_com(n, k - 1, current_sum + i, i, current_combination + [i])
+
+
 def gen_combi_filter(n, k, max_symbols):
     com = [c[::-1] for c in list(gen_com(n, k))]
     tmp = []
@@ -56,17 +59,20 @@ def gen_combi_filter(n, k, max_symbols):
             tmp += [c]
     return tmp
 
+
 def encode_data_for_relay(time, request_id=1, tsArr=[]):
     data = "0xd7e7178a"
     data += eth_abi.encode_abi(['(uint256,uint256)'], [(time, request_id)]).hex()
     data += "0000000000000000000000000000000000000000000000000000000000000060"
     data += eth_abi.encode_abi(['uint256'], [len(tsArr)]).hex()
-    data += eth_abi.encode_abi(['uint256']*len(tsArr), [(len(tsArr)*32) + (i*128) for i in range(len(tsArr))]).hex()
+    data += eth_abi.encode_abi(['uint256'] * len(tsArr),
+                               [(len(tsArr) * 32) + (i * 128) for i in range(len(tsArr))]).hex()
     for t, s in tsArr:
         data += eth_abi.encode_abi(['uint256'], [t]).hex()
-        data += eth_abi.encode_abi(['uint256','uint256'], [64,3]).hex()
+        data += eth_abi.encode_abi(['uint256', 'uint256'], [64, 3]).hex()
         data += s.encode().hex() + '0000000000000000000000000000000000000000000000000000000000'
     return data
+
 
 def create_tx(data):
     return {
@@ -79,9 +85,11 @@ def create_tx(data):
         'chainId': mappping[network]['chain_id']
     }
 
-t = 20_250
+
+t = 155
 max_symbols = 18
-for j in range(1, max_symbols+1):
+begin = max_symbols - 5
+for j in range(begin, max_symbols + 1):
     c = gen_combi_filter(j, math.ceil(max_symbols / 6), max_symbols)
     gen_data = generate_data(j, max_symbols)
     for cc in c:
@@ -103,10 +111,10 @@ for j in range(1, max_symbols+1):
         if transaction_receipt["status"] == 1:
             print("time = ", t)
             print("(max_symbols, relay_amount)=", (max_symbols, j))
-            print("pattern=",cc)
-            print("data=", json.dumps(data).replace(" ",""))
+            print("pattern=", cc)
+            print("data=", json.dumps(data).replace(" ", ""))
             print("gasUsed=", transaction_receipt["gasUsed"])
-            print("transactionHash=",transaction_receipt["transactionHash"].hex())
+            print("transactionHash=", transaction_receipt["transactionHash"].hex())
             print("=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=")
             time.sleep(5)
             t += 1

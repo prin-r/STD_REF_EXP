@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
+import "forge-std/Test.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
@@ -32,7 +33,13 @@ abstract contract StdReferenceBase is IStdReference {
     }
 }
 
-contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
+type SV is uint256;
+type ST is uint256;
+type SS is uint256;
+type SSL is uint256;
+type STO is uint256;
+
+contract STD_E_3_1 is AccessControl, StdReferenceBase, Initializable {
 
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
     bytes32 private constant USD = keccak256(bytes("USD"));
@@ -55,66 +62,52 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
         _grantRole(RELAYER_ROLE, msg.sender);
     }
 
-    function _extractSlotTime(uint256 val) private pure returns (uint256 t) {
-        unchecked {
-            t = (val >> 225) & ((1 << 31) - 1);
-        }
+    function _extractSlotTime(SV val) private pure returns (ST t) {
+        t = ST.wrap((SV.unwrap(val) >> 225) & ((1 << 31) - 1));
     }
 
-    function _extractSize(uint256 val) private pure returns (uint256 s) {
-        unchecked {
-            s = (val >> 222) & ((1<<3) - 1);
-        }
+    function _extractSize(SV val) private pure returns (SS s) {
+        s = SS.wrap((SV.unwrap(val) >> 222) & ((1<<3) - 1));
     }
 
-    function _extractTicks(uint256 val, uint256 shiftLen) private pure returns (uint256 ticks) {
-        unchecked {
-            ticks = (val >> shiftLen) & ((1 << 19) - 1);
-        }
+    function _extractTicks(SV val, SSL shiftLen) private pure returns (uint256 ticks) {
+        ticks = (SV.unwrap(val) >> SSL.unwrap(shiftLen)) & ((1 << 19) - 1);
     }
 
-    function _extractTimeOffset(uint256 val, uint256 shiftLen) private pure returns (uint256 offset) {
-        unchecked {
-            offset = (val >> shiftLen) & ((1 << 18) - 1);
-        }
+    function _extractTimeOffset(SV val, SSL shiftLen) private pure returns (STO offset) {
+        offset = STO.wrap((SV.unwrap(val) >> SSL.unwrap(shiftLen)) & ((1 << 18) - 1));
     }
 
-    function _setTime(uint256 val, uint256 time) private pure returns (uint256 newVal) {
-        unchecked {
-            newVal = (val & (type(uint256).max >> 31)) | (time << 225);
-        }
+    function _setTime(SV val, ST time) private pure returns (SV newVal) {
+        newVal = SV.wrap((SV.unwrap(val) & (type(uint256).max >> 31)) | (ST.unwrap(time) << 225));
     }
 
-    function _setSize(uint256 val, uint256 size) private pure returns (uint256 newVal) {
-        unchecked {
-            newVal = (val & (type(uint256).max - ((((1<<3) - 1)) << 222))) | (size << 222);
-        }
+    function _setSize(SV val, SS size) private pure returns (SV newVal) {
+        newVal = SV.wrap((SV.unwrap(val) & (type(uint256).max - ((((1<<3) - 1)) << 222))) | (SS.unwrap(size) << 222));
     }
 
-    function _setTimeOffset(uint256 val, uint256 timeOffset, uint256 shiftLen) private pure returns (uint256 newVal) {
-        unchecked {
-            newVal = (val & ~(uint256((1 << 18) - 1) << (shiftLen + 19)) | (timeOffset << (shiftLen + 19)));
-        }
+    function _setTimeOffset(SV val, STO timeOffset, SSL shiftLen) private pure returns (SV newVal) {
+        newVal = SV.wrap((SV.unwrap(val) & ~(uint256((1 << 18) - 1) << (SSL.unwrap(shiftLen) + 19))) | (STO.unwrap(timeOffset) << (SSL.unwrap(shiftLen) + 19)));
     }
 
-    function _setTicksAndTimeOffset(uint256 val, uint256 timeOffset, uint256 ticks, uint256 shiftLen) private pure returns(uint256 newVal) {
-        unchecked {
-            newVal = (val & (~(uint256((1 << 37) - 1) << shiftLen))) | (((timeOffset << 19) | ticks & ((1<<19) - 1)) << shiftLen);
-        }
+    function _setTicksAndTimeOffset(SV val, STO timeOffset, uint256 ticks, SSL shiftLen) private pure returns(SV newVal) {
+        newVal = SV.wrap(
+            (SV.unwrap(val) & (~(uint256((1 << 37) - 1) << SSL.unwrap(shiftLen)))) | (((STO.unwrap(timeOffset) << 19) | ticks & ((1<<19) - 1)) << SSL.unwrap(shiftLen))
+        );
     }
     
     function _getTicksAndTime(string memory symbol) private view returns (uint256 ticks, uint256 lastUpdated) {
         unchecked {
             uint256 id = symbolsToIDs[symbol];
             require(id != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
-            uint256 sVal = refs[(id - 1) / 6];
+            SV sVal = SV.wrap(refs[(id - 1) / 6]);
             uint256 index = (id - 1) % 6;
-            uint256 shiftLen = 185 - (index * 37);
+            SSL shiftLen = SSL.wrap(185 - (index * 37));
             (ticks, lastUpdated) = (
                 _extractTicks(sVal, shiftLen),
-                _extractTimeOffset(sVal, shiftLen + 19)
+                STO.unwrap(_extractTimeOffset(sVal, SSL.wrap(SSL.unwrap(shiftLen) + 19)))
             );
-            lastUpdated += _extractSlotTime(sVal);
+            lastUpdated += ST.unwrap(_extractSlotTime(sVal));
         }
     }
 
@@ -216,14 +209,14 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
 
         uint256 _totalSymbolsCount = totalSymbolsCount;
         uint256 sid = _totalSymbolsCount / 6;
-        uint256 sVal = refs[sid];
-        uint256 sSize = _extractSize(sVal);
+        SV sVal = SV.wrap(refs[sid]);
+        SS sSize = _extractSize(sVal);
 
         _totalSymbolsCount++;
         symbolsToIDs[symbols[0]] = _totalSymbolsCount;
         idsToSymbols[_totalSymbolsCount] = symbols[0];
 
-        sSize = sSize + 1;
+        sSize = SS.wrap(SS.unwrap(sSize) + 1);
         sVal = _setSize(sVal, sSize);
 
         for (uint256 i = 1; i < symbols.length; i++) {
@@ -237,18 +230,18 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
             idsToSymbols[_totalSymbolsCount] = symbols[i];
 
             if (sid != slotID) {
-                refs[sid] = sVal;
+                refs[sid] = SV.unwrap(sVal);
 
                 sid = slotID;
-                sVal = refs[sid];
+                sVal = SV.wrap(refs[sid]);
                 sSize = _extractSize(sVal);
             }
 
-            sSize = sSize + 1;
+            sSize = SS.wrap(SS.unwrap(sSize) + 1);
             sVal = _setSize(sVal, sSize);
         }
 
-        refs[sid] = sVal;
+        refs[sid] = SV.unwrap(sVal);
         totalSymbolsCount = _totalSymbolsCount;
     }
 
@@ -265,18 +258,18 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
 
             uint256 sid = (_totalSymbolsCount - 1) / 6;
             uint256 indexInSlot = (_totalSymbolsCount - 1) % 6;
-            uint256 sVal = refs[sid];
-            uint256 sSize = _extractSize(sVal);
-            uint256 shiftLen = 37*(5-indexInSlot);
-            uint256 lastSegment = (sVal >> shiftLen) & ((1 << 37) - 1);
-            sSize = sSize - 1;
-            sVal = sVal & (type(uint256).max << (37*(6 - sSize)));
-            refs[sid] = _setSize(sVal, sSize);
+            SV sVal = SV.wrap(refs[sid]);
+            SS sSize = _extractSize(sVal);
+            SSL shiftLen = SSL.wrap(37*(5-indexInSlot));
+            uint256 lastSegment = (SV.unwrap(sVal) >> SSL.unwrap(shiftLen)) & ((1 << 37) - 1);
+            sSize = SS.wrap(SS.unwrap(sSize) - 1);
+            sVal = SV.wrap(SV.unwrap(sVal) & (type(uint256).max << (37*(6 - SS.unwrap(sSize)))));
+            refs[sid] = SV.unwrap(_setSize(sVal, sSize));
 
             sid = (id - 1) / 6;
             indexInSlot = (id - 1) % 6;
-            shiftLen = 37*(5-indexInSlot);
-            refs[sid] = (refs[sid] & (type(uint256).max - (((1<<37) - 1) << shiftLen))) | (lastSegment << shiftLen);
+            shiftLen = SSL.wrap(37*(5-indexInSlot));
+            refs[sid] = (refs[sid] & (type(uint256).max - (((1<<37) - 1) << SSL.unwrap(shiftLen)))) | (lastSegment << SSL.unwrap(shiftLen));
 
             delete symbolsToIDs[symbols[i]];
             delete idsToSymbols[_totalSymbolsCount];
@@ -292,29 +285,29 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
             uint256 id;
             uint256 sid = type(uint256).max;
             uint256 nextSID;
-            uint256 sTime;
-            uint256 sVal;
-            uint256 shiftLen;
+            ST sTime;
+            SV sVal;
+            SSL shiftLen;
             for (uint256 i = 0; i < ps.length; i++) {
                 id = symbolsToIDs[ps[i].symbol];
                 require(id != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
 
                 nextSID = (id - 1) / 6;
                 if (sid != nextSID) {
-                    if (sVal != 0) refs[sid] = sVal;
+                    if (SV.unwrap(sVal) != 0) refs[sid] = SV.unwrap(sVal);
 
-                    sVal = refs[nextSID];
+                    sVal = SV.wrap(refs[nextSID]);
                     sid = nextSID;
                     sTime = _extractSlotTime(sVal);
                 }
 
-                shiftLen = 204 - (37*((id - 1) % 6));
-                require(sTime + _extractTimeOffset(sVal, shiftLen) < time, "FAIL_NEW_TIME_<=_CURRENT");
-                require(time < sTime + (1<<18), "FAIL_DELTA_TIME_EXCEED_3_DAYS");
-                sVal = _setTicksAndTimeOffset(sVal, time - sTime, ps[i].ticks, shiftLen - 19);
+                shiftLen = SSL.wrap(204 - (37*((id - 1) % 6)));
+                require(ST.unwrap(sTime) + STO.unwrap(_extractTimeOffset(sVal, shiftLen)) < time, "FAIL_NEW_TIME_<=_CURRENT");
+                require(time < ST.unwrap(sTime) + (1<<18), "FAIL_DELTA_TIME_EXCEED_3_DAYS");
+                sVal = _setTicksAndTimeOffset(sVal, STO.wrap(time - ST.unwrap(sTime)), ps[i].ticks, SSL.wrap(SSL.unwrap(shiftLen) - 19));
             }
 
-            if (sVal != 0) refs[sid] = sVal;
+            if (SV.unwrap(sVal) != 0) refs[sid] = SV.unwrap(sVal);
         }
     }
 
@@ -322,39 +315,39 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
         unchecked {
             uint256 id;
             uint256 nextID;
-            uint256 sVal;
-            uint256 sTime;
-            uint256 sSize;
-            uint256 shiftLen;
-            uint256 timeOffset;
+            SV sVal;
+            ST sTime;
+            SS sSize;
+            SSL shiftLen;
+            STO timeOffset;
             uint256 i;
             while (i < ps.length) {
                 id = symbolsToIDs[ps[i].symbol];
                 require(id != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
                 require((id - 1) % 6 == 0, "FAIL_INVALID_FIRST_ID");
-                sVal = refs[(id - 1) / 6];
+                sVal = SV.wrap(refs[(id - 1) / 6]);
                 (sTime, sSize) = (_extractSlotTime(sVal), _extractSize(sVal));
-                require(sTime < time, "FAIL_NEW_TIME_<=_CURRENT");
-                shiftLen = 204;
+                require(ST.unwrap(sTime) < time, "FAIL_NEW_TIME_<=_CURRENT");
+                shiftLen = SSL.wrap(204);
                 timeOffset = _extractTimeOffset(sVal, shiftLen);
-                shiftLen = shiftLen - 19;
-                sVal = sTime + timeOffset <= time ?
-                    _setTicksAndTimeOffset(sVal, 0, ps[i].ticks, shiftLen) :
-                    _setTimeOffset(sVal, (sTime + timeOffset) - time, shiftLen);
-                for (uint256 j = i + 1; j < i + sSize; j++) {
+                shiftLen = SSL.wrap(SSL.unwrap(shiftLen) - 19);
+                sVal = ST.unwrap(sTime) + STO.unwrap(timeOffset) <= time ?
+                    _setTicksAndTimeOffset(sVal, STO.wrap(0), ps[i].ticks, shiftLen) :
+                    _setTimeOffset(sVal, STO.wrap((ST.unwrap(sTime) + STO.unwrap(timeOffset)) - time), shiftLen);
+                for (uint256 j = i + 1; j < i + SS.unwrap(sSize); j++) {
                     require(j < ps.length, "FAIL_INCONSISTENT_SIZES");
                     nextID = symbolsToIDs[ps[j].symbol];
                     require(nextID != 0, "FAIL_SYMBOL_NOT_AVAILABLE");
                     require(nextID + i == id + j, "FAIL_INVALID_ID_SEQUENCE");
-                    shiftLen = shiftLen - 18;
+                    shiftLen = SSL.wrap(SSL.unwrap(shiftLen) - 18);
                     timeOffset = _extractTimeOffset(sVal, shiftLen);
-                    shiftLen = shiftLen - 19;
-                    sVal = sTime + timeOffset <= time ?
-                        _setTicksAndTimeOffset(sVal, 0, ps[j].ticks, shiftLen) :
-                        _setTimeOffset(sVal, (sTime + timeOffset) - time, shiftLen);
+                    shiftLen = SSL.wrap(SSL.unwrap(shiftLen) - 19);
+                    sVal = ST.unwrap(sTime) + STO.unwrap(timeOffset) <= time ?
+                        _setTicksAndTimeOffset(sVal, STO.wrap(0), ps[j].ticks, shiftLen) :
+                        _setTimeOffset(sVal, STO.wrap((ST.unwrap(sTime) + STO.unwrap(timeOffset)) - time), shiftLen);
                 }
-                refs[(id - 1) / 6] = _setTime(sVal, time);
-                i += sSize;
+                refs[(id - 1) / 6] = SV.unwrap(_setTime(sVal, ST.wrap(time)));
+                i += SS.unwrap(sSize);
             }
         }
     }
@@ -378,4 +371,5 @@ contract STD_E_3 is AccessControl, StdReferenceBase, Initializable {
             lastUpdatedQuote: timeQuote
         });
     }
+
 }
